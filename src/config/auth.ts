@@ -1,4 +1,4 @@
-import { PrismaAdapter } from '@auth/prisma-adapter';
+import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { PrismaClient } from '@prisma/client';
 import { NextAuthOptions } from 'next-auth';
 import GithubProvider from 'next-auth/providers/github';
@@ -19,11 +19,11 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async session({ session, user }) {
+    async session({ session, token }) {
       if (session.user) {
-        session.user.id = user.id;
+        session.user.id = token.id;
         const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
+          where: { id: token.id },
           select: { githubId: true, username: true },
         });
         if (dbUser) {
@@ -32,6 +32,24 @@ export const authOptions: NextAuthOptions = {
         }
       }
       return session;
+    },
+    async jwt({ token, user, account, profile }) {
+      if (user) {
+        token.id = user.id;
+      }
+      if (account?.provider === 'github' && profile) {
+        const githubProfile = profile as any;
+        await prisma.user.update({
+          where: { id: token.id as string },
+          data: {
+            githubId: githubProfile.id?.toString(),
+            username: githubProfile.login,
+          },
+        });
+        token.githubId = githubProfile.id?.toString();
+        token.username = githubProfile.login;
+      }
+      return token;
     },
     async signIn({ user, account, profile }) {
       if (account?.provider === 'github' && profile) {
