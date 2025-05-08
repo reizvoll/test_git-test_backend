@@ -1,6 +1,7 @@
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { PrismaClient } from '@prisma/client';
 import { NextAuthOptions } from 'next-auth';
+import { JWT } from 'next-auth/jwt';
 import GithubProvider from 'next-auth/providers/github';
 
 const prisma = new PrismaClient();
@@ -19,11 +20,11 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: JWT }) {
       if (session.user) {
-        session.user.id = token.id;
+        session.user.id = token.id as string;
         const dbUser = await prisma.user.findUnique({
-          where: { id: token.id },
+          where: { id: token.id as string },
           select: { githubId: true, username: true },
         });
         if (dbUser) {
