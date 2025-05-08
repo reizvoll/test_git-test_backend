@@ -12,6 +12,7 @@ model User {
   githubId   String     @unique
   username   String
   accessToken String
+  image      String?    // GitHub 프로필 이미지 URL
   activities Activity[]
   accounts   Account[]
   sessions   Session[]

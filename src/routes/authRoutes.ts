@@ -45,6 +45,7 @@ router.get('/callback/github', async (req, res) => {
       githubId: githubUser.id.toString(),
       username: githubUser.login,
       accessToken: access_token,
+      image: githubUser.avatar_url,
     };
 
     const user = await prisma.user.upsert({
@@ -58,7 +59,8 @@ router.get('/callback/github', async (req, res) => {
       id: user.id,
       githubId: user.githubId,
       username: user.username,
-      accessToken: access_token
+      accessToken: access_token,
+      image: user.image
     };
 
     const token = jwt.sign(
@@ -88,6 +90,7 @@ router.get('/session', authenticateToken, async (req, res) => {
         id: true,
         githubId: true,
         username: true,
+        image: true,
       },
     });
     res.json(user);

@@ -10,6 +10,7 @@ declare global {
         githubId: string;
         username: string;
         accessToken: string;
+        image?: string;
       };
     }
   }
@@ -29,6 +30,7 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
       githubId: string;
       username: string;
       accessToken: string;
+      image?: string;
     };
     req.user = decoded;
     next();
