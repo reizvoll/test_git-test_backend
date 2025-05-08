@@ -1,111 +1,50 @@
 import axios from 'axios';
-import { createActivity } from '../models/activity';
+import prisma from '../config/db';
+import { GitHubEvent } from '../types/github';
 
-interface GitHubEvent {
-  type: string;
-  repo: {
-    name: string;
-  };
-  payload: {
-    commits?: Array<{
-      message: string;
-      url: string;
-    }>;
-  };
-  created_at: string;
-}
-
-interface GitHubPullRequest {
-  number: number;
-  title: string;
-  html_url: string;
-  repository: {
-    name: string;
-  };
-  created_at: string;
-}
-
-interface GitHubIssue {
-  number: number;
-  title: string;
-  html_url: string;
-  repository: {
-    name: string;
-  };
-  created_at: string;
-}
-
-export const fetchUserActivities = async (
-  accessToken: string,
-  userId: string
-): Promise<void> => {
+export const fetchUserActivities = async (accessToken: string, userId: string) => {
   try {
-    // Fetch commits
-    const commitsResponse = await axios.get<GitHubEvent[]>(
-      'https://api.github.com/user/events',
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+    // GitHub API에서 사용자 활동 가져오기
+    const response = await axios.get<GitHubEvent[]>('https://api.github.com/user/events', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    // 활동 데이터 저장
+    const activities = response.data.map((event) => {
+      let title = '';
+      let url = '';
+
+      // 이벤트 타입에 따라 title과 url 설정
+      if (event.payload.pull_request) {
+        title = event.payload.pull_request.title;
+        url = event.payload.pull_request.html_url;
+      } else if (event.payload.issue) {
+        title = event.payload.issue.title;
+        url = event.payload.issue.html_url;
+      } else if (event.payload.commits?.[0]) {
+        title = event.payload.commits[0].message;
+        url = event.payload.commits[0].url;
       }
-    );
 
-    const commits = commitsResponse.data
-      .filter((event) => event.type === 'PushEvent')
-      .flatMap((event) => 
-        event.payload.commits?.map(commit => ({
-          userId,
-          type: 'commit' as const,
-          repository: event.repo.name,
-          title: commit.message,
-          url: commit.url,
-          createdAt: new Date(event.created_at)
-        })) || []
-      );
+      return {
+        userId,
+        type: event.type,
+        repository: event.repo.name,
+        title,
+        url,
+        createdAt: new Date(event.created_at),
+      };
+    });
 
-    // Fetch pull requests
-    const prsResponse = await axios.get<GitHubPullRequest[]>(
-      'https://api.github.com/user/issues?filter=created',
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    // 데이터베이스에 활동 저장
+    await prisma.gitHubActivity.createMany({
+      data: activities,
+      skipDuplicates: true,
+    });
 
-    const prs = prsResponse.data.map((pr) => ({
-      userId,
-      type: 'pull_request' as const,
-      repository: pr.repository.name,
-      title: pr.title,
-      url: pr.html_url,
-      createdAt: new Date(pr.created_at)
-    }));
-
-    // Fetch issues
-    const issuesResponse = await axios.get<GitHubIssue[]>(
-      'https://api.github.com/user/issues?filter=created',
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    const issues = issuesResponse.data.map((issue) => ({
-      userId,
-      type: 'issue' as const,
-      repository: issue.repository.name,
-      title: issue.title,
-      url: issue.html_url,
-      createdAt: new Date(issue.created_at)
-    }));
-
-    // Save all activities
-    const allActivities = [...commits, ...prs, ...issues];
-    for (const activity of allActivities) {
-      await createActivity(activity);
-    }
+    return activities;
   } catch (error) {
     console.error('Error fetching GitHub activities:', error);
     throw error;
