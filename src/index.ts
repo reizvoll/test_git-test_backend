@@ -1,20 +1,21 @@
 import cors from 'cors';
+import dotenv from 'dotenv';
 import express from 'express';
-import helmet from 'helmet';
-import morgan from 'morgan';
 import { connectDB } from './config/db';
 import { errorHandler } from './middlewares/errorHandler';
 import activityRoutes from './routes/activityRoutes';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 
+dotenv.config();
 const app = express();
 
 // Middleware
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true,
+}));
 app.use(express.json());
-app.use(cors());
-app.use(helmet());
-app.use(morgan('dev'));
 
 // Database connection
 connectDB();
