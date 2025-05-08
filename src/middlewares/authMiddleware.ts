@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
-import { getToken } from 'next-auth/jwt';
+import jwt from 'jsonwebtoken';
+import { authConfig } from '../config/auth';
 
 declare global {
   namespace Express {
@@ -7,30 +8,29 @@ declare global {
       user?: {
         id: string;
         githubId: string;
-        email: string;
+        username: string;
+        accessToken: string;
       };
     }
   }
 }
 
-export const authenticateToken = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'No token provided' });
+  }
+
   try {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    
-    if (!token) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    req.user = {
-      id: token.id as string,
-      githubId: token.sub!,
-      email: token.email as string,
+    const decoded = jwt.verify(token, authConfig.jwt.secret) as {
+      id: string;
+      githubId: string;
+      username: string;
+      accessToken: string;
     };
-
+    req.user = decoded;
     next();
   } catch (error) {
     return res.status(403).json({ message: 'Invalid token' });
