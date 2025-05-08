@@ -2,12 +2,12 @@ import axios from 'axios';
 import prisma from '../config/db';
 import { GitHubEvent } from '../types/github';
 
-export const fetchUserActivities = async (accessToken: string, userId: string) => {
+export const fetchUserActivities = async (accessToken: string, userId: string, username: string) => {
   try {
     // GitHub API에서 사용자 활동 가져오기
-    const response = await axios.get<GitHubEvent[]>('https://api.github.com/user/events', {
+    const response = await axios.get<GitHubEvent[]>(`https://api.github.com/users/${username}/events`, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `token ${accessToken}`,
       },
     });
 

@@ -1,6 +1,7 @@
 import express from 'express';
+import prisma from '../config/db';
 import { authenticateToken } from '../middlewares/authMiddleware';
-import { getActivityStats, getUserActivities } from '../models/activity';
+import { getActivityStats } from '../models/activity';
 import { fetchUserActivities } from '../services/githubService';
 
 const router = express.Router();
@@ -10,7 +11,10 @@ router.use(authenticateToken);
 // Get user's GitHub activities
 router.get('/', async (req, res) => {
   try {
-    const activities = await getUserActivities(req.user!.id);
+    const activities = await prisma.gitHubActivity.findMany({
+      where: { userId: req.user!.id },
+      orderBy: { createdAt: 'desc' }
+    });
     res.json(activities);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching activities' });
@@ -30,12 +34,13 @@ router.get('/stats', async (req, res) => {
 // Sync GitHub activities
 router.post('/sync', async (req, res) => {
   try {
-    const accessToken = req.headers.authorization?.split(' ')[1];
-    if (!accessToken) {
-      return res.status(401).json({ message: 'Access token is required' });
+    // DB에서 로그인된 사용자의 accessToken 조회
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user || !user.accessToken) {
+      return res.status(401).json({ message: 'GitHub access token not found' });
     }
 
-    await fetchUserActivities(accessToken, req.user!.id);
+    await fetchUserActivities(user.accessToken, req.user!.id, user.username);
     res.json({ message: 'Activities synced successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error syncing activities' });
