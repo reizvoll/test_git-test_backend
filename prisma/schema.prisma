@@ -7,6 +7,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id         String     @id @default(cuid())
+  githubId   String     @unique
+  username   String
+  accessToken String
+  activities Activity[]
+  accounts   Account[]
+  sessions   Session[]
+  githubActivities GitHubActivity[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  repoName  String
+  payload   Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -46,21 +72,6 @@ model GitHubActivity {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-}
-
-model User {
-  id            String          @id @default(cuid())
-  name          String?
-  email         String?         @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  githubId      String?         @unique
-  username      String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  activities    GitHubActivity[]
 }
 
 model VerificationToken {
