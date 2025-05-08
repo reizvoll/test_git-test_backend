@@ -68,10 +68,10 @@ router.get('/callback/github', async (req, res) => {
     );
 
     // 프론트엔드로 리다이렉트 (토큰 포함)
-    res.redirect(`http://localhost:3001/auth/callback?token=${token}`);
+    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}`);
   } catch (error) {
     console.error('GitHub OAuth error:', error);
-    res.redirect('http://localhost:3001/auth/error');
+    res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
   }
 });
 
