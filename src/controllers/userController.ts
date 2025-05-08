@@ -1,21 +1,21 @@
 import { Request, Response } from 'express';
-import * as userService from '../services/userService';
+import * as userModel from '../models/user';
 
-export const createUser = async (req: Request, res: Response): Promise<void> => {
+export const createUser = async (req: Request, res: Response) => {
   try {
-    const user = await userService.createUser(req.body);
+    const { githubId, username, accessToken } = req.body;
+    const user = await userModel.createUser({ githubId, username, accessToken });
     res.status(201).json(user);
   } catch (error) {
     res.status(500).json({ message: 'Error creating user' });
   }
 };
 
-export const getUser = async (req: Request, res: Response): Promise<void> => {
+export const getUser = async (req: Request, res: Response) => {
   try {
-    const user = await userService.getUserById(req.params.id);
+    const user = await userModel.getUser(req.params.id);
     if (!user) {
-      res.status(404).json({ message: 'User not found' });
-      return;
+      return res.status(404).json({ message: 'User not found' });
     }
     res.json(user);
   } catch (error) {
@@ -23,23 +23,19 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-export const updateUser = async (req: Request, res: Response): Promise<void> => {
+export const updateUser = async (req: Request, res: Response) => {
   try {
-    const user = await userService.updateUser(req.params.id, req.body);
-    if (!user) {
-      res.status(404).json({ message: 'User not found' });
-      return;
-    }
+    const user = await userModel.updateUser(req.params.id, req.body);
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Error updating user' });
   }
 };
 
-export const deleteUser = async (req: Request, res: Response): Promise<void> => {
+export const deleteUser = async (req: Request, res: Response) => {
   try {
-    await userService.deleteUser(req.params.id);
-    res.status(204).send();
+    await userModel.deleteUser(req.params.id);
+    res.json({ message: 'User deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting user' });
   }
