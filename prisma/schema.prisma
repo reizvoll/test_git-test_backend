@@ -35,6 +35,7 @@ model GitHubActivity {
   title       String
   description String?  @db.Text
   url         String
+  eventId     String   @unique
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
