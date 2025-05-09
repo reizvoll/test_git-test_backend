@@ -11,38 +11,53 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
       },
     });
 
-    // 활동 데이터 저장
+    // 현재 DB에 저장된 가장 최근 활동의 시간 조회
+    const latestActivity = await prisma.gitHubActivity.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // 활동 데이터 변환 및 중복 체크
     const activities = response.data.map((event) => {
-      let title = '';
-      let url = '';
+        let title = '';
+        let url = '';
 
-      // 이벤트 타입에 따라 title과 url 설정
-      if (event.payload.pull_request) {
-        title = event.payload.pull_request.title;
-        url = event.payload.pull_request.html_url;
-      } else if (event.payload.issue) {
-        title = event.payload.issue.title;
-        url = event.payload.issue.html_url;
-      } else if (event.payload.commits?.[0]) {
-        title = event.payload.commits[0].message;
-        url = event.payload.commits[0].url;
-      }
+        // 이벤트 타입에 따라 title과 url 설정
+        if (event.payload.pull_request) {
+          title = event.payload.pull_request.title;
+          url = event.payload.pull_request.html_url;
+        } else if (event.payload.issue) {
+          title = event.payload.issue.title;
+          url = event.payload.issue.html_url;
+        } else if (event.payload.commits?.[0]) {
+          title = event.payload.commits[0].message;
+          url = event.payload.commits[0].url;
+        }
 
-      return {
-        userId,
-        type: event.type,
-        repository: event.repo.name,
-        title,
-        url,
-        createdAt: new Date(event.created_at),
-      };
-    });
+        return {
+          userId,
+          type: event.type,
+          repository: event.repo.name,
+          title,
+          url,
+          createdAt: new Date(event.created_at),
+        };
+      })
+      .filter(activity => {
+        // 최근 활동이 없는 경우 모든 활동 저장
+        if (!latestActivity) return true;
+        
+        // 새로운 활동만 필터링 (createdAt이 최근 활동보다 이후인 경우)
+        return activity.createdAt > latestActivity.createdAt;
+      });
 
-    // 데이터베이스에 활동 저장
-    await prisma.gitHubActivity.createMany({
-      data: activities,
-      skipDuplicates: true,
-    });
+    if (activities.length > 0) {
+      // 새로운 활동만 데이터베이스에 저장
+      await prisma.gitHubActivity.createMany({
+        data: activities,
+        skipDuplicates: true,
+      });
+    }
 
     return activities;
   } catch (error) {
