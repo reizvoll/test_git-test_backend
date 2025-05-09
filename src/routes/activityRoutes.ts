@@ -1,7 +1,6 @@
 import express from 'express';
 import prisma from '../config/db';
 import { authenticateToken } from '../middlewares/authMiddleware';
-import { getActivityStats } from '../models/activity';
 import { fetchUserActivities } from '../services/githubService';
 
 const router = express.Router();
@@ -24,7 +23,11 @@ router.get('/', async (req, res) => {
 // Get activity statistics
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await getActivityStats(req.user!.id);
+    const stats = await prisma.gitHubActivity.groupBy({
+      by: ['type'],
+      where: { userId: req.user!.id },
+      _count: true
+    });
     res.json(stats);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching activity stats' });
@@ -40,10 +43,33 @@ router.post('/sync', async (req, res) => {
       return res.status(401).json({ message: 'GitHub access token not found' });
     }
 
+    // 최신 활동 가져오기
     await fetchUserActivities(user.accessToken, req.user!.id, user.username);
-    res.json({ message: 'Activities synced successfully' });
+
+    // DB에서 최신 활동 조회 (새로 가져온 활동 포함)
+    const activities = await prisma.gitHubActivity.findMany({
+      where: { userId: req.user!.id },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      message: 'Activities synced successfully',
+      activities
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error syncing activities' });
+  }
+});
+
+// Delete all GitHub activities for the user
+router.delete('/', async (req, res) => {
+  try {
+    await prisma.gitHubActivity.deleteMany({
+      where: { userId: req.user!.id }
+    });
+    res.json({ message: 'All activities deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting activities' });
   }
 });
 
