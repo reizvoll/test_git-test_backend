@@ -47,24 +47,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get contribution details by ID
-router.get('/:id', async (req, res) => {
-  try {
-    const activity = await prisma.gitHubActivity.findUnique({
-      where: {
-        id: req.params.id,
-        userId: req.user!.id
-      }
-    });
-    if (!activity) {
-      return res.status(404).json({ message: 'Contribution not found' });
-    }
-    res.json(activity);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching contribution details' });
-  }
-});
-
 // Get activity statistics
 router.get('/stats', async (req, res) => {
   try {
@@ -106,11 +88,23 @@ router.get('/stats', async (req, res) => {
 
 // Get contribution analytics
 router.get('/analytics', async (req, res) => {
+
   try {
-    const { period } = req.query;
+    const { period, year } = req.query;
     const where: any = { userId: req.user!.id };
 
-    if (period) {
+    if (period === 'all') {
+      // No date filtering for 'all' period
+    } else if (period === 'year' && year) {
+      // Specific year filtering
+      const startDate = new Date(parseInt(year as string), 0, 1);
+      const endDate = new Date(parseInt(year as string), 11, 31, 23, 59, 59);
+      where.createdAt = {
+        gte: startDate,
+        lte: endDate
+      };
+    } else if (period) {
+      // Default period filtering (day, week, month, year)
       const now = new Date();
       const periods: { [key: string]: number } = {
         day: 24 * 60 * 60 * 1000,
@@ -128,9 +122,14 @@ router.get('/analytics', async (req, res) => {
     const timeline = await prisma.gitHubActivity.groupBy({
       by: ['createdAt'],
       where,
-      _count: true,
+      _sum: { contributionCount: true },
       orderBy: { createdAt: 'asc' }
     });
+
+    const timelineForFrontend = timeline.map(day => ({
+      date: day.createdAt,
+      count: day._sum.contributionCount || 0
+    }));
 
     const repositoryDistribution = await prisma.gitHubActivity.groupBy({
       by: ['repository'],
@@ -144,13 +143,51 @@ router.get('/analytics', async (req, res) => {
       _count: true
     });
 
+    // Get available years
+    const availableYears = await prisma.gitHubActivity.findMany({
+      where: { userId: req.user!.id },
+      select: {
+        createdAt: true
+      },
+      distinct: ['createdAt']
+    });
+
+    const years = [...new Set(availableYears.map(activity => 
+      new Date(activity.createdAt).getFullYear()
+    ))].sort((a, b) => b - a); // Sort in descending order
+
     res.json({
-      timeline,
-      repositoryDistribution,
-      timePattern
+      success: true,
+      data: {
+        timeline: timelineForFrontend,
+        repositoryDistribution,
+        timePattern,
+        availableYears: years
+      }
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching contribution analytics' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Error fetching contribution analytics' 
+    });
+  }
+});
+
+// Get contribution details by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const activity = await prisma.gitHubActivity.findUnique({
+      where: {
+        id: req.params.id,
+        userId: req.user!.id
+      }
+    });
+    if (!activity) {
+      return res.status(404).json({ message: 'Contribution not found' });
+    }
+    res.json(activity);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching contribution details' });
   }
 });
 
