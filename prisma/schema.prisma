@@ -30,12 +30,15 @@ model Session {
 model GitHubActivity {
   id          String   @id @default(cuid())
   userId      String
-  type        String   // commit, pull request, issue 등
+  type        String   // Contribution, Commit, PullRequest
   repository  String
   title       String
   description String?  @db.Text
   url         String
   eventId     String   @unique
+  contributionCount Int @default(1)  // 각 활동의 contribution 수
+  state       String?  // PullRequest의 상태 (MERGED, CLOSED)
+  mergedAt    DateTime? // PullRequest가 머지된 시간
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
