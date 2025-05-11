@@ -175,7 +175,7 @@ router.get('/analytics', async (req: AuthRequest, res: Response) => {
 
     // Convert to years and sort
     const yearsArray = availableYears.map((activity: { createdAt: Date }) => new Date(activity.createdAt).getFullYear());
-    const years = [...new Set(yearsArray)].sort((a: number, b: number) => b - a);
+    const years = [...(new Set(yearsArray) as Set<number>)].sort((a, b) => b - a);
 
     res.json({
       success: true,
