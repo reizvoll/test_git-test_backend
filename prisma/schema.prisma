@@ -36,9 +36,7 @@ model GitHubActivity {
   description String?  @db.Text
   url         String
   eventId     String   @unique
-  contributionCount Int @default(1)  // 각 활동의 contribution 수
-  state       String?  // PullRequest의 상태 (MERGED, CLOSED)
-  mergedAt    DateTime? // PullRequest가 머지된 시간
+  contributionCount Int?  // optional로 변경, 기본값 제거
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
