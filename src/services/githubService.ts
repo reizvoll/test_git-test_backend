@@ -25,11 +25,15 @@ const CONTRIBUTIONS_QUERY = `
           defaultBranchRef {
             target {
               ... on Commit {
-                history(first: 100, author: {id: $username}) {
+                history(first: 100) {
                   nodes {
                     committedDate
                     message
                     url
+                    author {
+                      name
+                      email
+                    }
                   }
                 }
               }
@@ -108,15 +112,18 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
     userData.repositories.nodes.forEach((repo: any) => {
       if (repo.defaultBranchRef?.target?.history?.nodes) {
         repo.defaultBranchRef.target.history.nodes.forEach((commit: any) => {
-          activities.push({
-            userId,
-            type: 'Commit',
-            repository: repo.name,
-            title: commit.message,
-            url: commit.url,
-            createdAt: new Date(commit.committedDate),
-            eventId: `commit-${commit.url}`
-          });
+          // 커밋 작성자가 현재 사용자인 경우에만 추가
+          if (commit.author && (commit.author.name === username || commit.author.email?.includes(username))) {
+            activities.push({
+              userId,
+              type: 'Commit',
+              repository: repo.name,
+              title: commit.message,
+              url: commit.url,
+              createdAt: new Date(commit.committedDate),
+              eventId: `commit-${commit.url}`
+            });
+          }
         });
       }
     });
@@ -142,53 +149,30 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
 
     console.log('Processed activities:', activities.length);
 
-    // get the latest activity from the DB
-    const latestActivity = await prisma.gitHubActivity.findFirst({
+    // Get all existing activities for this user
+    const existingActivities = await prisma.gitHubActivity.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' }
+      select: { eventId: true }
     });
 
-    // filter new activities
-    const newActivities = activities.filter(activity => {
-      if (!latestActivity) return false;
-      return activity.createdAt > latestActivity.createdAt;
-    });
+    // Filter out activities that already exist in the DB
+    const newActivities = activities.filter(activity => 
+      !existingActivities.some(existing => 
+        existing.eventId === activity.eventId
+      )
+    );
 
     console.log('New activities to save:', newActivities.length);
 
     if (newActivities.length > 0) {
-      // save new activities to the DB
+      // Save new activities to the DB
       await prisma.gitHubActivity.createMany({
         data: newActivities,
         skipDuplicates: true,
       });
-      return newActivities;
-    } else {
-      // no update activities, get previous activities
-      const existingActivities = await prisma.gitHubActivity.findMany({
-        where: { userId },
-        select: { eventId: true }
-      });
-
-      // filter out the activities already saved in the DB
-      const newPreviousActivities = activities.filter(activity => 
-        !existingActivities.some(existing => 
-          existing.eventId === activity.eventId
-        )
-      );
-
-      console.log('Previous activities to save:', newPreviousActivities.length);
-
-      if (newPreviousActivities.length > 0) {
-        // save the new previous activities to the DB
-        await prisma.gitHubActivity.createMany({
-          data: newPreviousActivities,
-          skipDuplicates: true,
-        });
-      }
-
-      return newPreviousActivities;
     }
+
+    return newActivities;
   } catch (error) {
     console.error('Detailed error:', error);
     if (error instanceof AxiosError) {

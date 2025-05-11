@@ -1,3 +1,14 @@
+export interface GitHubActivity {
+  id: string;
+  userId: string;
+  type: 'commit' | 'pull_request' | 'issue';
+  repository: string;
+  title: string;
+  url: string;
+  eventId: string;
+  createdAt: Date;
+}
+
 export interface GitHubEvent {
   id: string;
   type: string;
