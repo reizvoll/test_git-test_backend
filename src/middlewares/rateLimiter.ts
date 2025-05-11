@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 // sync request rate limiter
 export const syncLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 3, // max 3 requests per IP
+  max: 10, // max 10 requests per IP
   message: {
     message: 'Too many sync requests, please try again after 5 minutes'
   },
@@ -14,7 +14,7 @@ export const syncLimiter = rateLimit({
 // auto sync settings rate limiter
 export const autoSyncLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 2, // max 2 requests per IP
+  max: 10, // max 10 requests per IP
   message: {
     message: 'Too many auto sync settings changes, please try again after 1 hour'
   },
