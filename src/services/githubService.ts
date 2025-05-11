@@ -76,8 +76,6 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
       }
     );
 
-    console.log('GraphQL Response:', JSON.stringify(response.data, null, 2));
-
     if (response.data.errors) {
       console.error('GraphQL Errors:', response.data.errors);
       throw new Error(response.data.errors[0].message);
@@ -147,8 +145,6 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
       }
     });
 
-    console.log('Processed activities:', activities.length);
-
     // Get all existing activities for this user
     const existingActivities = await prisma.gitHubActivity.findMany({
       where: { userId },
@@ -157,12 +153,9 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
 
     // Filter out activities that already exist in the DB
     const newActivities = activities.filter(activity => 
-      !existingActivities.some(existing => 
-        existing.eventId === activity.eventId
-      )
-    );
-
-    console.log('New activities to save:', newActivities.length);
+      !existingActivities.some((existing: { eventId: string }) => 
+      existing.eventId === activity.eventId
+    ));
 
     if (newActivities.length > 0) {
       // Save new activities to the DB
