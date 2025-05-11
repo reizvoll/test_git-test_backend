@@ -1,10 +1,11 @@
+import { GitHubActivity, GitHubGraphQLResponse } from '@/types/github';
 import axios, { AxiosError } from 'axios';
 import prisma from '../config/db';
 
-// save auto sync users
+// Save auto sync users
 const autoSyncUsers = new Map<string, NodeJS.Timeout>();
 
-// GraphQL 쿼리 정의
+// GraphQL query definition
 const CONTRIBUTIONS_QUERY = `
   query($username: String!) {
     user(login: $username) {
@@ -57,12 +58,12 @@ const CONTRIBUTIONS_QUERY = `
   }
 `;
 
-export const fetchUserActivities = async (accessToken: string, userId: string, username: string) => {
+export const fetchUserActivities = async (accessToken: string, userId: string, username: string): Promise<GitHubActivity[]> => {
   try {
     console.log('Fetching activities for user:', username);
-    
-    // GraphQL API 호출
-    const response = await axios.post(
+
+    // Call GraphQL API
+    const response = await axios.post<GitHubGraphQLResponse>(
       'https://api.github.com/graphql',
       {
         query: CONTRIBUTIONS_QUERY,
@@ -76,8 +77,6 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
       }
     );
 
-    console.log('GraphQL Response:', JSON.stringify(response.data, null, 2));
-
     if (response.data.errors) {
       console.error('GraphQL Errors:', response.data.errors);
       throw new Error(response.data.errors[0].message);
@@ -88,66 +87,62 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
       throw new Error('User data not found');
     }
 
-    const activities: any[] = [];
+    const activities: GitHubActivity[] = [];
 
-    // Contribution 데이터 변환
-    userData.contributionsCollection.contributionCalendar.weeks.forEach((week: any) => {
-      week.contributionDays.forEach((day: any) => {
+    // Transform Contribution data
+    userData.contributionsCollection.contributionCalendar.weeks.forEach((week) => {
+      week.contributionDays.forEach((day) => {
         if (day.contributionCount > 0) {
           activities.push({
             userId,
-            type: 'Contribution',
+            type: 'contribution',
             repository: 'GitHub',
             title: `${day.contributionCount} contributions on ${day.date}`,
             url: `https://github.com/${username}`,
             createdAt: new Date(day.date),
             eventId: `contribution-${day.date}`,
-            contributionCount: day.contributionCount
+            contributionCount: day.contributionCount,
           });
         }
       });
     });
 
-    // Commits 데이터 변환
-    userData.repositories.nodes.forEach((repo: any) => {
+    // Transform Commits data
+    userData.repositories.nodes.forEach((repo) => {
       if (repo.defaultBranchRef?.target?.history?.nodes) {
-        repo.defaultBranchRef.target.history.nodes.forEach((commit: any) => {
-          // 커밋 작성자가 현재 사용자인 경우에만 추가
+        repo.defaultBranchRef.target.history.nodes.forEach((commit) => {
+          // Only add commits authored by the current user
           if (commit.author && (commit.author.name === username || commit.author.email?.includes(username))) {
             activities.push({
               userId,
-              type: 'Commit',
+              type: 'commit',
               repository: repo.name,
               title: commit.message,
               url: commit.url,
               createdAt: new Date(commit.committedDate),
-              eventId: `commit-${commit.url}`
+              eventId: `commit-${commit.url}`,
             });
           }
         });
       }
     });
 
-    // Pull Requests 데이터 변환
-    userData.repositories.nodes.forEach((repo: any) => {
+    // Transform Pull Requests data
+    userData.repositories.nodes.forEach((repo) => {
       if (repo.pullRequests?.nodes) {
-        repo.pullRequests.nodes.forEach((pr: any) => {
+        repo.pullRequests.nodes.forEach((pr) => {
           activities.push({
             userId,
-            type: 'PullRequest',
+            type: 'pull_request',
             repository: pr.repository.name,
             title: pr.title,
             url: pr.url,
             createdAt: new Date(pr.createdAt),
             eventId: `pr-${pr.url}`,
-            state: pr.state,
-            mergedAt: pr.mergedAt ? new Date(pr.mergedAt) : null
           });
         });
       }
     });
-
-    console.log('Processed activities:', activities.length);
 
     // Get all existing activities for this user
     const existingActivities = await prisma.gitHubActivity.findMany({
@@ -157,12 +152,9 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
 
     // Filter out activities that already exist in the DB
     const newActivities = activities.filter(activity => 
-      !existingActivities.some(existing => 
-        existing.eventId === activity.eventId
-      )
-    );
-
-    console.log('New activities to save:', newActivities.length);
+      !existingActivities.some((existing: { eventId: string }) => 
+      existing.eventId === activity.eventId
+    ));
 
     if (newActivities.length > 0) {
       // Save new activities to the DB
@@ -182,7 +174,7 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
   }
 };
 
-export const setupAutoSync = async (userId: string) => {
+export const setupAutoSync = async (userId: string): Promise<boolean> => {
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || !user.accessToken) {
@@ -212,11 +204,11 @@ export const setupAutoSync = async (userId: string) => {
   }
 };
 
-export const stopAutoSync = (userId: string) => {
+export const stopAutoSync = (userId: string): boolean => {
   if (autoSyncUsers.has(userId)) {
     clearInterval(autoSyncUsers.get(userId));
     autoSyncUsers.delete(userId);
     return true;
   }
   return false;
-}; 
+};

@@ -1,14 +1,15 @@
 export interface GitHubActivity {
-  id: string;
   userId: string;
-  type: 'commit' | 'pull_request' | 'issue';
+  type: 'commit' | 'pull_request' | 'contribution';
   repository: string;
   title: string;
   url: string;
   eventId: string;
   createdAt: Date;
+  contributionCount?: number;
 }
 
+// GitHubEvent represents the structure of a GitHub API event (REST API)
 export interface GitHubEvent {
   id: string;
   type: string;
@@ -35,4 +36,69 @@ export interface GitHubEvent {
     };
   };
   created_at: string;
-} 
+}
+
+// ActivityFilter defines the filter criteria for querying GitHub activities
+export interface ActivityFilter {
+  userId: string;
+  type?: 'commit' | 'pull_request' | 'issue' | 'Contribution';
+  repository?: string;
+  createdAt?: {
+    gte?: Date;
+    lte?: Date;
+  };
+}
+
+// GitHubGraphQLResponse represents the structure of the GraphQL API response
+export interface GitHubGraphQLResponse {
+  data: {
+    user: {
+      contributionsCollection: {
+        contributionCalendar: {
+          totalContributions: number;
+          weeks: Array<{
+            contributionDays: Array<{
+              date: string;
+              contributionCount: number;
+            }>;
+          }>;
+        };
+      };
+      repositories: {
+        nodes: Array<{
+          name: string;
+          defaultBranchRef?: {
+            target?: {
+              history?: {
+                nodes: Array<{
+                  committedDate: string;
+                  message: string;
+                  url: string;
+                  author: {
+                    name: string;
+                    email: string;
+                  };
+                }>;
+              };
+            };
+          };
+          pullRequests?: {
+            nodes: Array<{
+              title: string;
+              url: string;
+              createdAt: string;
+              mergedAt?: string;
+              state: 'MERGED' | 'CLOSED';
+              repository: {
+                name: string;
+              };
+            }>;
+          };
+        }>;
+      };
+    } | null;
+  };
+  errors?: Array<{
+    message: string;
+  }>;
+}

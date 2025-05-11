@@ -1,18 +1,34 @@
-import express from 'express';
+import type { ActivityFilter } from '@/types/github';
+import express, { Request, Response } from 'express';
 import prisma from '../config/db';
 import { authenticateToken } from '../middlewares/authMiddleware';
 import { autoSyncLimiter, syncLimiter } from '../middlewares/rateLimiter';
 import { fetchUserActivities, setupAutoSync, stopAutoSync } from '../services/githubService';
+
+// Extend the Request interface to include user from authenticateToken middleware
+export interface AuthRequest extends Request {
+  user?: {
+    id: string;
+    githubId: string;
+    username: string;
+    accessToken: string;
+    image?: string;
+  };
+}
 
 const router = express.Router();
 
 router.use(authenticateToken);
 
 // Get user's GitHub activities
-router.get('/', async (req, res) => {
-  try {
-    const { period, type, repository } = req.query;
-    const where: any = { userId: req.user!.id };
+router.get('/', async (req: AuthRequest, res: Response) => {
+try {
+    const { period, type, repository } = req.query as {
+      period?: string;
+      type?: 'commit' | 'pull_request' | 'issue';
+      repository?: string;
+    };
+    const where: ActivityFilter = { userId: req.user!.id };
 
     if (period) {
       const now = new Date();
@@ -22,9 +38,9 @@ router.get('/', async (req, res) => {
         month: 30 * 24 * 60 * 60 * 1000,
         year: 365 * 24 * 60 * 60 * 1000
       };
-      if (periods[period as string]) {
+      if (periods[period]) {
         where.createdAt = {
-          gte: new Date(now.getTime() - periods[period as string])
+          gte: new Date(now.getTime() - periods[period]),
         };
       }
     }
@@ -48,10 +64,10 @@ router.get('/', async (req, res) => {
 });
 
 // Get activity statistics
-router.get('/stats', async (req, res) => {
+router.get('/stats', async (req: AuthRequest, res: Response) => {
   try {
-    const { period } = req.query;
-    const where: any = { userId: req.user!.id };
+    const { period } = req.query as { period?: string };
+    const where: ActivityFilter = { userId: req.user!.id };
 
     // 기간별 필터링
     if (period) {
@@ -62,9 +78,9 @@ router.get('/stats', async (req, res) => {
         month: 30 * 24 * 60 * 60 * 1000,
         year: 365 * 24 * 60 * 60 * 1000
       };
-      if (periods[period as string]) {
+      if (periods[period]) {
         where.createdAt = {
-          gte: new Date(now.getTime() - periods[period as string])
+          gte: new Date(now.getTime() - periods[period]),
         };
       }
     }
@@ -87,20 +103,20 @@ router.get('/stats', async (req, res) => {
 });
 
 // Get contribution analytics
-router.get('/analytics', async (req, res) => {
+router.get('/analytics', async (req: AuthRequest, res: Response) => {
   try {
-    const { period, year } = req.query;
-    const where: any = { 
+    const { period, year } = req.query as { period?: string; year?: string };
+    const where: ActivityFilter = {
       userId: req.user!.id,
-      type: 'Contribution'  // Only contributions
+      type: 'commit', // Use 'commit' instead of 'Contribution'
     };
 
     if (period === 'all') {
       // No date filtering for 'all' period
     } else if (period === 'year' && year) {
       // Specific year filtering
-      const startDate = new Date(parseInt(year as string), 0, 1);
-      const endDate = new Date(parseInt(year as string), 11, 31, 23, 59, 59);
+      const startDate = new Date(parseInt(year), 0, 1);
+      const endDate = new Date(parseInt(year), 11, 31, 23, 59, 59);
       where.createdAt = {
         gte: startDate,
         lte: endDate
@@ -114,9 +130,9 @@ router.get('/analytics', async (req, res) => {
         month: 30 * 24 * 60 * 60 * 1000,
         year: 365 * 24 * 60 * 60 * 1000
       };
-      if (periods[period as string]) {
+      if (periods[period]) {
         where.createdAt = {
-          gte: new Date(now.getTime() - periods[period as string])
+          gte: new Date(now.getTime() - periods[period]),
         };
       }
     }
@@ -128,7 +144,7 @@ router.get('/analytics', async (req, res) => {
       orderBy: { createdAt: 'asc' }
     });
 
-    const timelineForFrontend = timeline.map(day => ({
+    const timelineForFrontend = timeline.map((day) => ({
       date: day.createdAt,
       count: day._sum.contributionCount || 0
     }));
@@ -147,7 +163,7 @@ router.get('/analytics', async (req, res) => {
 
     // Get available years
     const availableYears = await prisma.gitHubActivity.findMany({
-      where: { 
+      where: {
         userId: req.user!.id,
         type: 'Contribution'  // Only contributions
       },
@@ -171,7 +187,7 @@ router.get('/analytics', async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Error fetching contribution analytics' 
     });
@@ -179,7 +195,7 @@ router.get('/analytics', async (req, res) => {
 });
 
 // Get contribution details by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const activity = await prisma.gitHubActivity.findUnique({
       where: {
@@ -197,7 +213,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Sync GitHub activities
-router.post('/sync', syncLimiter, async (req, res) => {
+router.post('/sync', syncLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
     if (!user || !user.accessToken) {
@@ -216,10 +232,10 @@ router.post('/sync', syncLimiter, async (req, res) => {
 });
 
 // Sync GitHub activities automatically
-router.post('/sync/auto', autoSyncLimiter, async (req, res) => {
+router.post('/sync/auto', autoSyncLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { enabled } = req.body;
-    
+
     if (enabled) {
       const success = await setupAutoSync(req.user!.id);
       if (!success) {
@@ -238,4 +254,4 @@ router.post('/sync/auto', autoSyncLimiter, async (req, res) => {
   }
 });
 
-export default router; 
+export default router;
