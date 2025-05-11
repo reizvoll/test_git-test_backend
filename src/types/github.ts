@@ -1,47 +1,19 @@
 export interface GitHubActivity {
   userId: string;
-  type: 'commit' | 'pull_request' | 'contribution';
+  type: 'contribution' | 'commit' | 'pull_request';
   repository: string;
   title: string;
   url: string;
   eventId: string;
   createdAt: Date;
-  contributionCount?: number;
-}
+  contributionCount: number;
 
-// GitHubEvent represents the structure of a GitHub API event (REST API)
-export interface GitHubEvent {
-  id: string;
-  type: string;
-  repo: {
-    id: number;
-    name: string;
-    url: string;
-  };
-  payload: {
-    commits?: Array<{
-      sha: string;
-      message: string;
-      url: string;
-    }>;
-    pull_request?: {
-      number: number;
-      title: string;
-      html_url: string;
-    };
-    issue?: {
-      number: number;
-      title: string;
-      html_url: string;
-    };
-  };
-  created_at: string;
 }
 
 // ActivityFilter defines the filter criteria for querying GitHub activities
 export interface ActivityFilter {
   userId: string;
-  type?: 'commit' | 'pull_request' | 'issue' | 'Contribution';
+  type?: 'contribution' | 'commit' | 'pull_request';
   repository?: string;
   createdAt?: {
     gte?: Date;
@@ -101,4 +73,24 @@ export interface GitHubGraphQLResponse {
   errors?: Array<{
     message: string;
   }>;
+}
+
+// GroupByStats represents the result of groupBy queries for stats
+export interface GroupByStats {
+  type: string;
+  _count: number;
+}
+
+// GroupByTimeline represents the result of groupBy queries for timeline
+export interface GroupByTimeline {
+  createdAt: Date;
+  _sum: {
+    contributionCount: number | null;
+  };
+}
+
+// GroupByRepository represents the result of groupBy queries for repository distribution
+export interface GroupByRepository {
+  repository: string;
+  _count: number;
 }

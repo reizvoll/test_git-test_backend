@@ -1,4 +1,4 @@
-import type { ActivityFilter } from '@/types/github';
+import type { ActivityFilter, GroupByStats, GroupByTimeline } from '@/types/github';
 import express, { Request, Response } from 'express';
 import prisma from '../config/db';
 import { authenticateToken } from '../middlewares/authMiddleware';
@@ -22,10 +22,10 @@ router.use(authenticateToken);
 
 // Get user's GitHub activities
 router.get('/', async (req: AuthRequest, res: Response) => {
-try {
+  try {
     const { period, type, repository } = req.query as {
       period?: string;
-      type?: 'commit' | 'pull_request' | 'issue';
+      type?: 'contribution' | 'commit' | 'pull_request';
       repository?: string;
     };
     const where: ActivityFilter = { userId: req.user!.id };
@@ -91,7 +91,7 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       _count: true
     });
 
-    const totalCount = stats.reduce((acc, curr) => acc + curr._count, 0);
+    const totalCount = stats.reduce((acc: number, curr: GroupByStats) => acc + curr._count, 0);
 
     res.json({
       total: totalCount,
@@ -108,7 +108,7 @@ router.get('/analytics', async (req: AuthRequest, res: Response) => {
     const { period, year } = req.query as { period?: string; year?: string };
     const where: ActivityFilter = {
       userId: req.user!.id,
-      type: 'commit', // Use 'commit' instead of 'Contribution'
+      type: 'contribution', // Use 'contribution' for consistency
     };
 
     if (period === 'all') {
@@ -144,7 +144,7 @@ router.get('/analytics', async (req: AuthRequest, res: Response) => {
       orderBy: { createdAt: 'asc' }
     });
 
-    const timelineForFrontend = timeline.map((day) => ({
+    const timelineForFrontend = timeline.map((day: GroupByTimeline) => ({
       date: day.createdAt,
       count: day._sum.contributionCount || 0
     }));
@@ -173,9 +173,9 @@ router.get('/analytics', async (req: AuthRequest, res: Response) => {
       distinct: ['createdAt']
     });
 
-    const years = [...new Set(availableYears.map(activity => 
+    const years = [...new Set(availableYears.map((activity: { createdAt: Date }) => 
       new Date(activity.createdAt).getFullYear()
-    ))].sort((a, b) => b - a);
+    ))].sort((a: number, b: number) => b - a);
 
     res.json({
       success: true,
@@ -234,7 +234,7 @@ router.post('/sync', syncLimiter, async (req: AuthRequest, res: Response) => {
 // Sync GitHub activities automatically
 router.post('/sync/auto', autoSyncLimiter, async (req: AuthRequest, res: Response) => {
   try {
-    const { enabled } = req.body;
+    const { enabled } = req.body as { enabled: boolean };
 
     if (enabled) {
       const success = await setupAutoSync(req.user!.id);
