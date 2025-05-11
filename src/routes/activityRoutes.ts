@@ -88,10 +88,12 @@ router.get('/stats', async (req, res) => {
 
 // Get contribution analytics
 router.get('/analytics', async (req, res) => {
-
   try {
     const { period, year } = req.query;
-    const where: any = { userId: req.user!.id };
+    const where: any = { 
+      userId: req.user!.id,
+      type: 'Contribution'  // Only contributions
+    };
 
     if (period === 'all') {
       // No date filtering for 'all' period
@@ -145,7 +147,10 @@ router.get('/analytics', async (req, res) => {
 
     // Get available years
     const availableYears = await prisma.gitHubActivity.findMany({
-      where: { userId: req.user!.id },
+      where: { 
+        userId: req.user!.id,
+        type: 'Contribution'  // Only contributions
+      },
       select: {
         createdAt: true
       },
@@ -154,7 +159,7 @@ router.get('/analytics', async (req, res) => {
 
     const years = [...new Set(availableYears.map(activity => 
       new Date(activity.createdAt).getFullYear()
-    ))].sort((a, b) => b - a); // Sort in descending order
+    ))].sort((a, b) => b - a);
 
     res.json({
       success: true,
@@ -191,6 +196,25 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Sync GitHub activities
+router.post('/sync', syncLimiter, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user || !user.accessToken) {
+      return res.status(401).json({ message: 'GitHub access token not found' });
+    }
+
+    const activities = await fetchUserActivities(user.accessToken, req.user!.id, user.username);
+
+    res.json({
+      message: 'Contributions synced successfully',
+      activities
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error syncing contributions' });
+  }
+});
+
 // Sync GitHub activities automatically
 router.post('/sync/auto', autoSyncLimiter, async (req, res) => {
   try {
@@ -213,30 +237,5 @@ router.post('/sync/auto', autoSyncLimiter, async (req, res) => {
     res.status(500).json({ message: 'Error updating auto sync settings' });
   }
 });
-
-// Sync GitHub activities
-router.post('/sync', syncLimiter, async (req, res) => {
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
-    if (!user || !user.accessToken) {
-      return res.status(401).json({ message: 'GitHub access token not found' });
-    }
-
-    await fetchUserActivities(user.accessToken, req.user!.id, user.username);
-
-    const activities = await prisma.gitHubActivity.findMany({
-      where: { userId: req.user!.id },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    res.json({
-      message: 'Contributions synced successfully',
-      activities
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Error syncing contributions' });
-  }
-});
-
 
 export default router; 
