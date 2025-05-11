@@ -6,7 +6,7 @@ import { autoSyncLimiter, syncLimiter } from '../middlewares/rateLimiter';
 import { fetchUserActivities, setupAutoSync, stopAutoSync } from '../services/githubService';
 
 // Extend the Request interface to include user from authenticateToken middleware
-export interface AuthRequest extends Request {
+interface AuthRequest extends Request {
   user?: {
     id: string;
     githubId: string;
@@ -165,7 +165,7 @@ router.get('/analytics', async (req: AuthRequest, res: Response) => {
     const availableYears = await prisma.gitHubActivity.findMany({
       where: {
         userId: req.user!.id,
-        type: 'Contribution'  // Only contributions
+        type: 'contribution'  // Only contributions
       },
       select: {
         createdAt: true
@@ -173,9 +173,9 @@ router.get('/analytics', async (req: AuthRequest, res: Response) => {
       distinct: ['createdAt']
     });
 
-    const years = [...new Set(availableYears.map((activity: { createdAt: Date }) => 
-      new Date(activity.createdAt).getFullYear()
-    ))].sort((a: number, b: number) => b - a);
+    // Convert to years and sort
+    const yearsArray = availableYears.map((activity: { createdAt: Date }) => new Date(activity.createdAt).getFullYear());
+    const years = [...new Set(yearsArray)].sort((a: number, b: number) => b - a);
 
     res.json({
       success: true,
@@ -200,8 +200,8 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     const activity = await prisma.gitHubActivity.findUnique({
       where: {
         id: req.params.id,
-        userId: req.user!.id
-      }
+        userId: req.user!.id,
+      },
     });
     if (!activity) {
       return res.status(404).json({ message: 'Contribution not found' });
@@ -224,7 +224,7 @@ router.post('/sync', syncLimiter, async (req: AuthRequest, res: Response) => {
 
     res.json({
       message: 'Contributions synced successfully',
-      activities
+      activities,
     });
   } catch (error) {
     res.status(500).json({ message: 'Error syncing contributions' });
