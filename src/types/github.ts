@@ -1,13 +1,14 @@
 export interface GitHubActivity {
+  id: string;
   userId: string;
   type: 'contribution' | 'commit' | 'pull_request';
   repository: string;
   title: string;
+  description?: string;
   url: string;
   eventId: string;
   createdAt: Date;
-  contributionCount: number;
-
+  contributionCount?: number;
 }
 
 // ActivityFilter defines the filter criteria for querying GitHub activities

@@ -2,6 +2,7 @@ import { GitHubActivity, GitHubGraphQLResponse } from '@/types/github';
 import axios, { AxiosError } from 'axios';
 import prisma from '../config/db';
 
+type GitHubActivityInput = Omit<GitHubActivity, 'id'>;
 // Save auto sync users
 const autoSyncUsers = new Map<string, NodeJS.Timeout>();
 
@@ -40,13 +41,11 @@ const CONTRIBUTIONS_QUERY = `
               }
             }
           }
-          pullRequests(first: 100, states: [MERGED, CLOSED], orderBy: {field: CREATED_AT, direction: DESC}) {
+           pullRequests(first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
             nodes {
               title
               url
               createdAt
-              mergedAt
-              state
               repository {
                 name
               }
@@ -87,7 +86,7 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
       throw new Error('User data not found');
     }
 
-    const activities: GitHubActivity[] = [];
+    const activities: GitHubActivityInput[] = [];
 
     // Transform Contribution data
     userData.contributionsCollection.contributionCalendar.weeks.forEach((week) => {
@@ -98,6 +97,7 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
             type: 'contribution',
             repository: 'GitHub',
             title: `${day.contributionCount} contributions on ${day.date}`,
+            description: `User made ${day.contributionCount} contributions`,
             url: `https://github.com/${username}`,
             createdAt: new Date(day.date),
             eventId: `contribution-${day.date}`,
@@ -118,6 +118,7 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
               type: 'commit',
               repository: repo.name,
               title: commit.message,
+              description: `Commit to ${repo.name}`,
               url: commit.url,
               createdAt: new Date(commit.committedDate),
               eventId: `commit-${commit.url}`,
@@ -136,6 +137,7 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
             type: 'pull_request',
             repository: pr.repository.name,
             title: pr.title,
+            description: `Pull Request to ${pr.repository.name}`,
             url: pr.url,
             createdAt: new Date(pr.createdAt),
             eventId: `pr-${pr.url}`,
@@ -164,7 +166,14 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
       });
     }
 
-    return newActivities;
+    // Fetch the newly created activities to return with IDs
+    const savedActivities = (await prisma.gitHubActivity.findMany({
+      where: {
+        eventId: { in: newActivities.map((activity) => activity.eventId) },
+      },
+    })) as GitHubActivity[];
+
+    return savedActivities;
   } catch (error) {
     console.error('Detailed error:', error);
     if (error instanceof AxiosError) {
