@@ -1,5 +1,3 @@
-# Git Test Backend
-
 [English](#english) | [한국어](#korean)
 
 <a id="english"></a>
