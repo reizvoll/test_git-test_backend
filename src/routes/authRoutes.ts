@@ -54,12 +54,11 @@ router.get('/callback/github', async (req, res) => {
       create: userData,
     });
 
-    // JWT 토큰 생성
+    // JWT 토큰 생성 - accessToken을 제외하여 보안 강화
     const payload = { 
       id: user.id,
       githubId: user.githubId,
       username: user.username,
-      accessToken: access_token,
       image: user.image
     };
 
@@ -69,8 +68,18 @@ router.get('/callback/github', async (req, res) => {
       { expiresIn: authConfig.jwt.expiresIn }
     );
 
-    // 프론트엔드로 리다이렉트 (토큰 포함)
-    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}`);
+    // 쿠키로 토큰 전송 (URL 파라미터 방식 대신)
+    res.cookie('auth_token', token, {
+      httpOnly: true,  // JavaScript에서 접근 불가
+      secure: true, // HTTPS 필수 (개발/프로덕션 모두)
+      sameSite: 'none',  // 크로스 도메인 쿠키를 위해 'none'으로 변경
+      maxAge: 24 * 60 * 60 * 1000,  // 1일
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN  // 도메인 설정 추가
+    });
+    
+    // 토큰을 URL 파라미터로 전송하지 않고 리다이렉트
+    res.redirect(`${process.env.FRONTEND_URL}/auth/callback`);
   } catch (error) {
     console.error('GitHub OAuth error:', error);
     res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
@@ -99,8 +108,15 @@ router.get('/session', authenticateToken, async (req, res) => {
   }
 });
 
-// 로그아웃
+// 로그아웃 - 쿠키 제거 기능 추가
 router.post('/signout', (req, res) => {
+    res.clearCookie('auth_token', {
+    httpOnly: true,
+    secure: true, // HTTPS 필수
+    sameSite: 'none',
+    path: '/',
+    domain: process.env.COOKIE_DOMAIN  // 도메인 설정 추가
+  });
   res.json({ message: 'Signed out successfully' });
 });
 

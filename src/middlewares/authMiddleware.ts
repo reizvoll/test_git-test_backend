@@ -9,7 +9,6 @@ declare global {
         id: string;
         githubId: string;
         username: string;
-        accessToken: string;
         image?: string;
       };
     }
@@ -17,8 +16,15 @@ declare global {
 }
 
 export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+  // Authorization 헤더에서 토큰 확인
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const headerToken = authHeader && authHeader.split(' ')[1];
+  
+  // 쿠키에서 토큰 확인
+  const cookieToken = req.cookies?.auth_token;
+  
+  // 헤더 또는 쿠키에서 토큰 가져오기
+  const token = headerToken || cookieToken;
 
   if (!token) {
     return res.status(401).json({ message: 'No token provided' });
@@ -29,7 +35,6 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
       id: string;
       githubId: string;
       username: string;
-      accessToken: string;
       image?: string;
     };
     req.user = decoded;
