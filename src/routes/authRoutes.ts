@@ -72,8 +72,9 @@ router.get('/callback/github', async (req, res) => {
     res.cookie('auth_token', token, {
       httpOnly: true,  // JavaScript에서 접근 불가
       secure: process.env.NODE_ENV === 'production',  // 프로덕션 환경에서는 HTTPS만 허용
-      sameSite: 'lax',  // CSRF 보호
-      maxAge: 24 * 60 * 60 * 1000  // 1일
+      sameSite: 'none',  // 크로스 도메인 쿠키를 위해 'none'으로 변경
+      maxAge: 24 * 60 * 60 * 1000,  // 1일
+      domain: process.env.COOKIE_DOMAIN  // 도메인 설정 추가
     });
 
     // 토큰을 URL 파라미터로 전송하지 않고 리다이렉트

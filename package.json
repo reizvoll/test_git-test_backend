@@ -2,10 +2,10 @@
   "name": "git-test-backend",
   "version": "1.0.0",
   "description": "For testing purposes, GitHub activity tracking backend service",
-  "main": "dist/index.js",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "node dist/index.js",
-    "dev": "nodemon src/index.ts",
+    "start": "node dist/server.js",
+    "dev": "nodemon src/server.ts",
     "build": "tsc",
     "migrate": "ts-node src/db/migrations/migrate.ts"
   },
