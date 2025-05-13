@@ -9,7 +9,6 @@ declare global {
         id: string;
         githubId: string;
         username: string;
-        accessToken: string;
         image?: string;
       };
     }
@@ -17,8 +16,14 @@ declare global {
 }
 
 export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  // 토큰을 쿠키 또는 Authorization 헤더에서 가져옴 (둘 다 지원)
+  let token = req.cookies?.auth_token;
+  
+  // 쿠키에 토큰이 없으면 Authorization 헤더에서 확인 (기존 방식 지원)
+  if (!token) {
+    const authHeader = req.headers['authorization'];
+    token = authHeader && authHeader.split(' ')[1];
+  }
 
   if (!token) {
     return res.status(401).json({ message: 'No token provided' });
@@ -29,7 +34,6 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
       id: string;
       githubId: string;
       username: string;
-      accessToken: string;
       image?: string;
     };
     req.user = decoded;
