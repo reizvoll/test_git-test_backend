@@ -57,9 +57,19 @@ const CONTRIBUTIONS_QUERY = `
   }
 `;
 
-export const fetchUserActivities = async (accessToken: string, userId: string, username: string): Promise<GitHubActivity[]> => {
+export const fetchUserActivities = async (userId: string, username: string): Promise<GitHubActivity[]> => {
   try {
     console.log('Fetching activities for user:', username);
+
+    // 사용자의 accessToken을 데이터베이스에서 가져옴
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { accessToken: true }
+    });
+
+    if (!user?.accessToken) {
+      throw new Error('GitHub access token not found');
+    }
 
     // Call GraphQL API
     const response = await axios.post<GitHubGraphQLResponse>(
@@ -70,7 +80,7 @@ export const fetchUserActivities = async (accessToken: string, userId: string, u
       },
       {
         headers: {
-          Authorization: `token ${accessToken}`,
+          Authorization: `token ${user.accessToken}`,
           'Content-Type': 'application/json'
         }
       }
@@ -199,7 +209,7 @@ export const setupAutoSync = async (userId: string): Promise<boolean> => {
     const interval = 12 * 60 * 60 * 1000;
     const timer = setInterval(async () => {
       try {
-        await fetchUserActivities(user.accessToken, userId, user.username);
+        await fetchUserActivities(userId, user.username);
       } catch (error) {
         console.error('Auto sync failed:', error);
       }

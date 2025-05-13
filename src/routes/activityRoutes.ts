@@ -11,7 +11,6 @@ interface AuthRequest extends Request {
     id: string;
     githubId: string;
     username: string;
-    accessToken: string;
     image?: string;
   };
 }
@@ -69,7 +68,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
     const { period } = req.query as { period?: string };
     const where: ActivityFilter = { userId: req.user!.id };
 
-    // 기간별 필터링
     if (period) {
       const now = new Date();
       const periods: { [key: string]: number } = {
@@ -114,7 +112,6 @@ router.get('/analytics', async (req: AuthRequest, res: Response) => {
     if (period === 'all') {
       // No date filtering for 'all' period
     } else if (period === 'year' && year) {
-      // Specific year filtering
       const startDate = new Date(parseInt(year), 0, 1);
       const endDate = new Date(parseInt(year), 11, 31, 23, 59, 59);
       where.createdAt = {
@@ -122,7 +119,6 @@ router.get('/analytics', async (req: AuthRequest, res: Response) => {
         lte: endDate
       };
     } else if (period) {
-      // Default period filtering (day, week, month, year)
       const now = new Date();
       const periods: { [key: string]: number } = {
         day: 24 * 60 * 60 * 1000,
@@ -220,7 +216,7 @@ router.post('/sync', syncLimiter, async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ message: 'GitHub access token not found' });
     }
 
-    const activities = await fetchUserActivities(user.accessToken, req.user!.id, user.username);
+    const activities = await fetchUserActivities(req.user!.id, user.username);
 
     res.json({
       message: 'Contributions synced successfully',
