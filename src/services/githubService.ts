@@ -162,11 +162,19 @@ export const fetchUserActivities = async (userId: string, username: string): Pro
       select: { eventId: true }
     });
 
+    // Delete existing contributions before saving new ones
+    await prisma.gitHubActivity.deleteMany({
+      where: {
+        userId,
+        type: 'contribution'
+      }
+    });
+
     // Filter out activities that already exist in the DB
     const newActivities = activities.filter(activity => 
       !existingActivities.some((existing: { eventId: string }) => 
-      existing.eventId === activity.eventId
-    ));
+        existing.eventId === activity.eventId
+      ));
 
     if (newActivities.length > 0) {
       // Save new activities to the DB
