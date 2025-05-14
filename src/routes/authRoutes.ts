@@ -74,8 +74,7 @@ router.get('/callback/github', async (req, res) => {
       secure: true, // HTTPS 필수 (개발/프로덕션 모두)
       sameSite: 'none',  // 크로스 도메인 쿠키를 위해 'none'으로 변경
       maxAge: 24 * 60 * 60 * 1000,  // 1일
-      path: '/',
-      domain: process.env.COOKIE_DOMAIN  // 도메인 설정 추가
+      path: '/'
     });
     
     // 토큰을 URL 파라미터로 전송하지 않고 리다이렉트
@@ -110,12 +109,12 @@ router.get('/session', authenticateToken, async (req, res) => {
 
 // 로그아웃 - 쿠키 제거 기능 추가
 router.post('/signout', (req, res) => {
-    res.clearCookie('auth_token', {
+  res.cookie('auth_token', '', {
     httpOnly: true,
     secure: true, // HTTPS 필수
     sameSite: 'none',
     path: '/',
-    domain: process.env.COOKIE_DOMAIN  // 도메인 설정 추가
+    expires: new Date(0)
   });
   res.json({ message: 'Signed out successfully' });
 });
