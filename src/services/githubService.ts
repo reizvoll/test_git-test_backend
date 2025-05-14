@@ -170,11 +170,13 @@ export const fetchUserActivities = async (userId: string, username: string): Pro
       }
     });
 
-    // Filter out activities that already exist in the DB
+    // Filter out non-contribution activities that already exist in the DB
     const newActivities = activities.filter(activity => 
+      activity.type === 'contribution' || // Always include contributions
       !existingActivities.some((existing: { eventId: string }) => 
         existing.eventId === activity.eventId
-      ));
+      )
+    );
 
     if (newActivities.length > 0) {
       // Save new activities to the DB
