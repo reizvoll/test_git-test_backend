@@ -1,6 +1,7 @@
 import type { ActivityFilter, GroupByStats, GroupByTimeline } from '@/types/github';
 import express, { Request, Response } from 'express';
 import prisma from '../config/db';
+import { generateContributionsChart } from '../controllers/chartImageController';
 import { authenticateToken } from '../middlewares/authMiddleware';
 import { autoSyncLimiter, syncLimiter } from '../middlewares/rateLimiter';
 import { fetchUserActivities, setupAutoSync, stopAutoSync } from '../services/githubService';
@@ -17,6 +18,7 @@ interface AuthRequest extends Request {
 
 const router = express.Router();
 
+router.get('/chart.png', generateContributionsChart);
 router.use(authenticateToken);
 
 // Get user's GitHub activities
