@@ -18,7 +18,7 @@ interface AuthRequest extends Request {
 
 const router = express.Router();
 
-router.get('/chart.png', generateContributionsChart);
+router.get('/chart', generateContributionsChart);
 router.use(authenticateToken);
 
 // Get user's GitHub activities
