@@ -73,7 +73,11 @@ export const generateContributionsChart = async (req: Request, res: Response) =>
       return res.status(404).send(); 
     }
 
-    const chartJSNodeCanvas = new ChartJSNodeCanvas({ width: outputWidth, height: outputHeight });
+    const chartJSNodeCanvas = new ChartJSNodeCanvas({ 
+      width: outputWidth, 
+      height: outputHeight,
+      type: 'svg'
+    });
 
     const labels = timelineData.map(entry => formatDateForChart(entry.date));
     const dataCounts = timelineData.map(entry => entry.count);
@@ -105,6 +109,11 @@ export const generateContributionsChart = async (req: Request, res: Response) =>
             text: `Contribution Analytics for ${username}`,
             font: { size: 18 }, // Adjusted font size
           },
+          tooltip: {
+            enabled: true,
+            mode: 'index' as const,
+            intersect: false,
+          },
         },
         scales: {
           x: {
@@ -121,13 +130,18 @@ export const generateContributionsChart = async (req: Request, res: Response) =>
             },
           },
         },
+        interaction: {
+          mode: 'nearest' as const,
+          axis: 'x' as const,
+          intersect: false
+        },
       },
     };
 
-    const buffer = await chartJSNodeCanvas.renderToBuffer(configuration);
+    const svg = await chartJSNodeCanvas.renderToDataURL(configuration);
 
-    res.setHeader('Content-Type', 'image/png');
-    res.send(buffer);
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.send(svg);
 
   } catch (error: unknown) {
     let message = 'Error generating chart image.';
