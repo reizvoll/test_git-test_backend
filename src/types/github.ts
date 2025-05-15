@@ -95,3 +95,9 @@ export interface GroupByRepository {
   repository: string;
   _count: number;
 }
+
+// Entry for a timeline, typically date and count
+export interface ContributionTimelineEntry {
+  date: Date;
+  count: number;
+}

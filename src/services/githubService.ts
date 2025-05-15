@@ -1,4 +1,4 @@
-import { GitHubActivity, GitHubGraphQLResponse } from '@/types/github';
+import { ContributionTimelineEntry, GitHubActivity, GitHubGraphQLResponse } from '@/types/github';
 import axios, { AxiosError } from 'axios';
 import prisma from '../config/db';
 
@@ -240,4 +240,126 @@ export const stopAutoSync = (userId: string): boolean => {
     return true;
   }
   return false;
+};
+
+// GitHub GraphQL API Query for not-signed in user's contribution
+const PUBLIC_CONTRIBUTION_QUERY = `
+  query($username: String!, $from: DateTime, $to: DateTime) {
+    user(login: $username) {
+      contributionsCollection(from: $from, to: $to) {
+        contributionCalendar {
+          weeks {
+            contributionDays {
+              date
+              contributionCount
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+// Fetch public contribution calendar by username
+export const fetchPublicContributionCalendarByUsername = async (
+  username: string,
+  githubApiToken: string,
+  period?: string,
+  year?: string
+): Promise<ContributionTimelineEntry[]> => {
+  const apiUrl = process.env.GITHUB_GRAPHQL_API_URL;
+  if (!apiUrl) {
+    console.error('GITHUB_GRAPHQL_API_URL environment variable is not set.');
+    throw new Error('Server configuration error: GitHub API URL is missing.');
+  }
+
+  let fromDate: Date | undefined;
+  let toDate: Date | undefined = new Date();
+
+  if (period === 'all') {
+    fromDate = new Date();
+    fromDate.setFullYear(toDate.getFullYear() - 5);
+  } else if (period === 'year' && year) {
+    const numericYear = parseInt(year);
+    fromDate = new Date(numericYear, 0, 1);
+    toDate = new Date(numericYear, 11, 31, 23, 59, 59);
+  } else if (period) {
+    const now = new Date();
+    const periodMap: Record<string, number> = {
+      'day': 1, 'week': 7, 'month': 30, 'year': 365,
+    };
+    const days = periodMap[period.toLowerCase()];
+    if (days) {
+      fromDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+      toDate = now;
+    } else {
+      fromDate = new Date();
+      fromDate.setFullYear(new Date().getFullYear() - 1);
+    }
+  } else {
+    fromDate = new Date();
+    fromDate.setFullYear(new Date().getFullYear() - 1);
+  }
+
+  try {
+    const response = await axios.post<GitHubGraphQLResponse>(
+      apiUrl,
+      {
+        query: PUBLIC_CONTRIBUTION_QUERY,
+        variables: { 
+          username,
+          from: fromDate?.toISOString(), 
+          to: toDate?.toISOString() 
+        },
+      },
+      {
+        headers: {
+          Authorization: `bearer ${githubApiToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const apiErrors = response.data?.errors;
+    if (apiErrors && apiErrors.length > 0) {
+      console.error('GitHub GraphQL API Errors:', apiErrors);
+      const userNotFound = apiErrors.some(e => e.message.toLowerCase().includes('could not resolve to a user') || e.message.toLowerCase().includes('not found')) || !response.data?.data?.user;
+      if (userNotFound) {
+         throw new Error(`GitHub user '${username}' not found.`);
+      }
+      throw new Error(apiErrors.map(e => e.message).join(', '));
+    }
+
+    const contributionsData = response.data?.data;
+    if (!contributionsData?.user?.contributionsCollection?.contributionCalendar?.weeks) {
+      console.warn(`No contribution calendar weeks found for user '${username}' for the period.`);
+      return [];
+    }
+
+    const weeks = contributionsData.user.contributionsCollection.contributionCalendar.weeks;
+
+    const timeline: ContributionTimelineEntry[] = [];
+    weeks.forEach(week => { 
+      week.contributionDays.forEach(day => {
+        if (day.contributionCount > 0) {
+          timeline.push({
+            date: new Date(day.date),
+            count: day.contributionCount,
+          });
+        }
+      });
+    });
+    return timeline.sort((a,b) => a.date.getTime() - b.date.getTime());
+
+  } catch (error) {
+    if (error instanceof AxiosError && error.response?.status === 401) {
+        console.error(`GitHub API authentication failed for ${username}:`, error.message);
+        throw new Error('GitHub API authentication failed. Check your PAT.');
+    } else if (error instanceof Error) {
+        console.error(`Error fetching public contributions for ${username}:`, error.message);
+        throw error;
+    }
+    console.error(`An unexpected error occurred while fetching public contributions for ${username}:`, error);
+    throw new Error(`Failed to fetch public contributions for ${username} due to an unexpected error.`); 
+  }
 };
