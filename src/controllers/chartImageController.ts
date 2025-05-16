@@ -76,10 +76,7 @@ export const generateContributionsChart = async (req: Request, res: Response) =>
     const chartJSNodeCanvas = new ChartJSNodeCanvas({ 
       width: outputWidth, 
       height: outputHeight,
-      type: 'svg',
-      plugins: {
-        modern: ['chartjs-plugin-datalabels']
-      }
+      type: 'svg'
     });
 
     const labels = timelineData.map(entry => formatDateForChart(entry.date));
