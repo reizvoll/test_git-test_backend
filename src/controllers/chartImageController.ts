@@ -76,7 +76,10 @@ export const generateContributionsChart = async (req: Request, res: Response) =>
     const chartJSNodeCanvas = new ChartJSNodeCanvas({ 
       width: outputWidth, 
       height: outputHeight,
-      type: 'svg'
+      type: 'svg',
+      plugins: {
+        modern: ['chartjs-plugin-datalabels']
+      }
     });
 
     const labels = timelineData.map(entry => formatDateForChart(entry.date));
@@ -100,6 +103,9 @@ export const generateContributionsChart = async (req: Request, res: Response) =>
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: {
+          duration: 2000
+        },
         plugins: {
           legend: {
             position: 'top' as const,
@@ -107,12 +113,7 @@ export const generateContributionsChart = async (req: Request, res: Response) =>
           title: {
             display: true,
             text: `Contribution Analytics for ${username}`,
-            font: { size: 18 }, // Adjusted font size
-          },
-          tooltip: {
-            enabled: true,
-            mode: 'index' as const,
-            intersect: false,
+            font: { size: 18 },
           },
         },
         scales: {
@@ -120,7 +121,6 @@ export const generateContributionsChart = async (req: Request, res: Response) =>
             ticks: {
               font: { size: 12 },
               autoSkip: true,
-              maxTicksLimit: 15,
             },
           },
           y: {
@@ -129,17 +129,11 @@ export const generateContributionsChart = async (req: Request, res: Response) =>
               font: { size: 12 },
             },
           },
-        },
-        interaction: {
-          mode: 'nearest' as const,
-          axis: 'x' as const,
-          intersect: false
-        },
+        }
       },
     };
 
     const svg = await chartJSNodeCanvas.renderToDataURL(configuration);
-
     res.setHeader('Content-Type', 'image/svg+xml');
     res.send(svg);
 
